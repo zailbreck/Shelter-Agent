@@ -4,7 +4,7 @@
 # Server Configuration
 server:
   # CHANGE THIS to your dashboard URL  
-  url: "https://YOUR-SERVER-URL-HERE.com/api"
+  url: "https://dashboard.shelter.my.id/api"
   verify_ssl: true  # Set to false for self-signed certificates
 
 # Agent Configuration (auto-generated during installation)
