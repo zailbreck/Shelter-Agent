@@ -19,9 +19,9 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Configuration - UPDATE THESE BEFORE DEPLOYMENT
-GITHUB_USER="YOUR-USERNAME"           # TODO: Change to your GitHub username
-GITHUB_REPO="YOUR-REPO"               # TODO: Change to your repo name
-GITHUB_BRANCH="main"                  # Branch to download from
+GITHUB_USER="zailbreck"           # TODO: Change to your GitHub username
+GITHUB_REPO="Shelter-Agent"               # TODO: Change to your repo name
+GITHUB_BRANCH="master"                  # Branch to download from
 AGENT_ZIP_URL="https://github.com/${GITHUB_USER}/${GITHUB_REPO}/archive/refs/heads/${GITHUB_BRANCH}.zip"
 
 # Installation settings
