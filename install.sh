@@ -210,7 +210,7 @@ install_python_packages() {
     
     # Upgrade pip silently
     $PYTHON_CMD -m pip install --upgrade pip > /dev/null 2>&1 || true
-    
+    log "pip upgraded"
     # Install required packages
     $PYTHON_CMD -m pip install psutil PyYAML > /dev/null 2>&1
     
