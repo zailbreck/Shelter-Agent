@@ -1,0 +1,28 @@
+# ShelterAgent Configuration Template
+# UPDATE THIS FILE BEFORE DEPLOYING TO GITHUB
+
+# Server Configuration
+server:
+  # CHANGE THIS to your dashboard URL  
+  url: "https://YOUR-SERVER-URL-HERE.com/api"
+  verify_ssl: true  # Set to false for self-signed certificates
+
+# Agent Configuration (auto-generated during installation)
+agent:
+  hwid: ""
+  hostname: ""
+  api_token: ""
+
+# Collection Intervals (in seconds)
+intervals:
+  collection: 5
+  send: 30
+  services: 60
+  heartbeat: 10
+
+# Logging
+logging:
+  level: "INFO"
+  file: "agent.log"
+  max_size_mb: 10
+  backup_count: 5
