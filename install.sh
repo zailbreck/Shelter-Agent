@@ -236,16 +236,26 @@ install_python_packages() {
         exit 1
     fi
     
+    # Check Python version for PEP 668 (Python 3.11+)
+    PYTHON_MAJOR=$($PYTHON_CMD -c 'import sys; print(sys.version_info.major)')
+    PYTHON_MINOR=$($PYTHON_CMD -c 'import sys; print(sys.version_info.minor)')
+    
+    PIP_FLAGS=""
+    if [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -ge 11 ]; then
+        log "Python 3.11+ detected, using --break-system-packages"
+        PIP_FLAGS="--break-system-packages"
+    fi
+    
     # Upgrade pip
-    $PYTHON_CMD -m pip install --upgrade pip > /dev/null 2>&1 || true
+    $PYTHON_CMD -m pip install --upgrade pip $PIP_FLAGS > /dev/null 2>&1 || true
     log "pip upgraded"
     
     # Install required packages
     log "Installing psutil and PyYAML..."
-    if ! $PYTHON_CMD -m pip install psutil PyYAML > /dev/null 2>&1; then
+    if ! $PYTHON_CMD -m pip install psutil PyYAML $PIP_FLAGS > /dev/null 2>&1; then
         error "Failed to install Python packages"
         echo "Trying with verbose output:"
-        $PYTHON_CMD -m pip install psutil PyYAML
+        $PYTHON_CMD -m pip install psutil PyYAML $PIP_FLAGS
         exit 1
     fi
     
