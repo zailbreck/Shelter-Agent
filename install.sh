@@ -206,60 +206,54 @@ install_python() {
 }
 
 install_python_packages() {
-    log "Installing Python packages..."
+    log "Setting up Python virtual environment..."
     
-    # Check if pip is available
-    if ! $PYTHON_CMD -m pip --version > /dev/null 2>&1; then
-        warn "pip not found, installing..."
-        
+    # Install python3-venv if not available
+    if ! $PYTHON_CMD -m venv --help > /dev/null 2>&1; then
+        log "Installing python3-venv..."
         case "$OS" in
             ubuntu|debian)
-                apt-get install -y python3-pip > /dev/null 2>&1
+                apt-get install -y python3-venv python3-dev > /dev/null 2>&1
                 ;;
             almalinux|rhel|centos|rocky)
                 if command -v dnf &> /dev/null; then
-                    dnf install -y python3-pip > /dev/null 2>&1
+                    dnf install -y python3-devel > /dev/null 2>&1
                 else
-                    yum install -y python3-pip > /dev/null 2>&1
+                    yum install -y python3-devel > /dev/null 2>&1
                 fi
                 ;;
         esac
-        
-        log "pip installed"
     fi
     
-    # Verify pip is now available
-    if ! $PYTHON_CMD -m pip --version > /dev/null 2>&1; then
-        error "Failed to install pip"
-        echo "Please install pip manually:"
-        echo "  dnf install python3-pip"
+    # Create installation directory if not exists
+    mkdir -p "$INSTALL_DIR"
+    
+    # Create virtual environment
+    log "Creating virtual environment at $INSTALL_DIR/venv..."
+    if ! $PYTHON_CMD -m venv "$INSTALL_DIR/venv"; then
+        error "Failed to create virtual environment"
         exit 1
     fi
     
-    # Check Python version for PEP 668 (Python 3.11+)
-    PYTHON_MAJOR=$($PYTHON_CMD -c 'import sys; print(sys.version_info.major)')
-    PYTHON_MINOR=$($PYTHON_CMD -c 'import sys; print(sys.version_info.minor)')
+    # Use venv's pip
+    VENV_PYTHON="$INSTALL_DIR/venv/bin/python"
+    VENV_PIP="$INSTALL_DIR/venv/bin/pip"
     
-    PIP_FLAGS=""
-    if [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -ge 11 ]; then
-        log "Python 3.11+ detected, using --break-system-packages"
-        PIP_FLAGS="--break-system-packages"
-    fi
+    # Upgrade pip in venv
+    log "Upgrading pip in virtual environment..."
+    $VENV_PIP install --upgrade pip > /dev/null 2>&1 || true
     
-    # Upgrade pip
-    $PYTHON_CMD -m pip install --upgrade pip $PIP_FLAGS > /dev/null 2>&1 || true
-    log "pip upgraded"
-    
-    # Install required packages
-    log "Installing psutil and PyYAML..."
-    if ! $PYTHON_CMD -m pip install psutil PyYAML $PIP_FLAGS > /dev/null 2>&1; then
+    # Install required packages in venv
+    log "Installing psutil and PyYAML in virtual environment..."
+    if ! $VENV_PIP install psutil PyYAML > /dev/null 2>&1; then
         error "Failed to install Python packages"
         echo "Trying with verbose output:"
-        $PYTHON_CMD -m pip install psutil PyYAML $PIP_FLAGS
+        $VENV_PIP install psutil PyYAML
         exit 1
     fi
     
-    log "Python packages installed (psutil, PyYAML)"
+    log "Python packages installed in virtual environment"
+    log "Virtual environment: $INSTALL_DIR/venv"
 }
 
 ###############################################################################
@@ -419,6 +413,9 @@ validate_config() {
 create_systemd_service() {
     log "Creating systemd service..."
     
+    # Use venv Python
+    VENV_PYTHON="$INSTALL_DIR/venv/bin/python"
+    
     cat > "/etc/systemd/system/$SERVICE_NAME.service" << EOF
 [Unit]
 Description=sys32 Monitoring Service
@@ -429,7 +426,7 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=$INSTALL_DIR
-ExecStart=$PYTHON_CMD $INSTALL_DIR/agent.py
+ExecStart=$VENV_PYTHON $INSTALL_DIR/agent.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -445,7 +442,7 @@ EOF
 
     systemctl daemon-reload
     
-    log "Systemd service created"
+    log "Systemd service created (using venv Python)"
 }
 
 start_service() {
@@ -509,7 +506,7 @@ main() {
         install_python
     fi
     
-    # Step 5: Python packages
+    # Step 5: Create venv and install Python packages (before downloading agent)
     install_python_packages
     
     # Step 6: Download from GitHub
