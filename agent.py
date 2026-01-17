@@ -391,6 +391,7 @@ class ShelterAgent(object):
             services = self.service_collector.collect()
             
             if not services:
+                logger.info("No services to send")
                 return True
             
             headers = {'Authorization': 'Bearer %s' % self.api_token}
@@ -409,11 +410,16 @@ class ShelterAgent(object):
                 logger.info("Sent %d services" % len(services))
                 return True
             else:
-                logger.warning("Failed to send services")
+                error_msg = response.get('message', 'Unknown error') if response else 'No response from server'
+                logger.warning("Failed to send services: %s" % error_msg)
+                if response and 'errors' in response:
+                    logger.error("Validation errors: %s" % str(response['errors']))
                 return False
                 
         except Exception as e:
             logger.error("Error sending services: %s" % str(e))
+            import traceback
+            traceback.print_exc()
             return False
 
     def run(self):
