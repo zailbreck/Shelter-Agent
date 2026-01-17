@@ -208,11 +208,46 @@ install_python() {
 install_python_packages() {
     log "Installing Python packages..."
     
-    # Upgrade pip silently
+    # Check if pip is available
+    if ! $PYTHON_CMD -m pip --version > /dev/null 2>&1; then
+        warn "pip not found, installing..."
+        
+        case "$OS" in
+            ubuntu|debian)
+                apt-get install -y python3-pip > /dev/null 2>&1
+                ;;
+            almalinux|rhel|centos|rocky)
+                if command -v dnf &> /dev/null; then
+                    dnf install -y python3-pip > /dev/null 2>&1
+                else
+                    yum install -y python3-pip > /dev/null 2>&1
+                fi
+                ;;
+        esac
+        
+        log "pip installed"
+    fi
+    
+    # Verify pip is now available
+    if ! $PYTHON_CMD -m pip --version > /dev/null 2>&1; then
+        error "Failed to install pip"
+        echo "Please install pip manually:"
+        echo "  dnf install python3-pip"
+        exit 1
+    fi
+    
+    # Upgrade pip
     $PYTHON_CMD -m pip install --upgrade pip > /dev/null 2>&1 || true
     log "pip upgraded"
+    
     # Install required packages
-    $PYTHON_CMD -m pip install psutil PyYAML > /dev/null 2>&1
+    log "Installing psutil and PyYAML..."
+    if ! $PYTHON_CMD -m pip install psutil PyYAML > /dev/null 2>&1; then
+        error "Failed to install Python packages"
+        echo "Trying with verbose output:"
+        $PYTHON_CMD -m pip install psutil PyYAML
+        exit 1
+    fi
     
     log "Python packages installed (psutil, PyYAML)"
 }
