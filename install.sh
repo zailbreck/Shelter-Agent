@@ -223,6 +223,7 @@ install_python_packages() {
 
 download_agent() {
     log "Downloading sys32 from GitHub..."
+    log "URL: $AGENT_ZIP_URL"
     
     # Create temp directory
     mkdir -p "$TEMP_DIR"
@@ -230,21 +231,41 @@ download_agent() {
     
     # Download ZIP from GitHub
     if command -v wget &> /dev/null; then
-        wget -q -O agent.zip "$AGENT_ZIP_URL" 2>&1 | grep -v "%" || true
+        log "Using wget to download..."
+        wget -O agent.zip "$AGENT_ZIP_URL" 2>&1 | tail -5
+        DOWNLOAD_RESULT=$?
     elif command -v curl &> /dev/null; then
+        log "Using curl to download..."
         curl -sSL -o agent.zip "$AGENT_ZIP_URL"
+        DOWNLOAD_RESULT=$?
     else
         error "Neither wget nor curl found!"
+        exit 1
+    fi
+    
+    if [ $DOWNLOAD_RESULT -ne 0 ]; then
+        error "Download failed with exit code: $DOWNLOAD_RESULT"
+        echo "URL: $AGENT_ZIP_URL"
         exit 1
     fi
     
     if [ ! -f agent.zip ]; then
         error "Failed to download agent from GitHub"
         echo "URL: $AGENT_ZIP_URL"
+        echo "Check if repository is public and branch name is correct"
         exit 1
     fi
     
-    log "Download complete"
+    # Check file size
+    FILE_SIZE=$(stat -f%z agent.zip 2>/dev/null || stat -c%s agent.zip 2>/dev/null)
+    if [ "$FILE_SIZE" -lt 1000 ]; then
+        error "Downloaded file is too small ($FILE_SIZE bytes)"
+        echo "Content:"
+        cat agent.zip
+        exit 1
+    fi
+    
+    log "Download complete ($FILE_SIZE bytes)"
 }
 
 extract_agent() {
@@ -253,35 +274,66 @@ extract_agent() {
     cd "$TEMP_DIR"
     
     # Extract ZIP
-    unzip -q agent.zip
+    log "Unzipping archive..."
+    if ! unzip -q agent.zip; then
+        error "Failed to extract ZIP file"
+        echo "Trying to see ZIP contents:"
+        unzip -l agent.zip | head -20
+        exit 1
+    fi
     
     # Find extracted directory (GitHub creates repo-branch format)
-    EXTRACTED_DIR=$(find . -maxdepth 1 -type d -name "${GITHUB_REPO}-*" | head -1)
+    log "Looking for extracted directory..."
+    ls -la
+    
+    EXTRACTED_DIR=$(find . -maxdepth 1 -type d -name "*${GITHUB_USER}*" -o -name "${GITHUB_REPO}*" | grep -v "^\.$" | head -1)
     
     if [ -z "$EXTRACTED_DIR" ]; then
         error "Failed to find extracted directory"
+        echo "Expected directory pattern: ${GITHUB_REPO}-*"
+        echo "Found directories:"
         ls -la
         exit 1
     fi
     
-    log "Extracted to: $EXTRACTED_DIR"
+    log "Found extracted directory: $EXTRACTED_DIR"
     
     # Create install directory
     mkdir -p "$INSTALL_DIR"
     
-    # Copy agent files from python-agent subdirectory
+    # Check for python-agent subdirectory
     if [ -d "$EXTRACTED_DIR/python-agent" ]; then
-        cp -r "$EXTRACTED_DIR/python-agent/"* "$INSTALL_DIR/"
+        log "Copying from python-agent/ subdirectory..."
+        cp -rv "$EXTRACTED_DIR/python-agent/"* "$INSTALL_DIR/" 2>&1 | head -10
     else
-        # Fallback: copy everything
-        cp -r "$EXTRACTED_DIR/"* "$INSTALL_DIR/"
+        log "No python-agent/ subdirectory, copying all files..."
+        echo "Available directories in $EXTRACTED_DIR:"
+        ls -la "$EXTRACTED_DIR"
+        cp -rv "$EXTRACTED_DIR/"* "$INSTALL_DIR/" 2>&1 | head -10
+    fi
+    
+    # Verify critical files exist
+    if [ ! -f "$INSTALL_DIR/agent.py" ]; then
+        error "agent.py not found after extraction!"
+        echo "Contents of $INSTALL_DIR:"
+        ls -la "$INSTALL_DIR"
+        exit 1
+    fi
+    
+    if [ ! -f "$INSTALL_DIR/config.yml" ]; then
+        error "config.yml not found after extraction!"
+        echo "Contents of $INSTALL_DIR:"
+        ls -la "$INSTALL_DIR"
+        exit 1
     fi
     
     # Set permissions
-    chmod +x "$INSTALL_DIR/agent.py" 2>/dev/null || true
-    chmod 600 "$INSTALL_DIR/config.yml" 2>/dev/null || true
+    chmod +x "$INSTALL_DIR/agent.py"
+    chmod 600 "$INSTALL_DIR/config.yml"
     
     log "Agent files installed to $INSTALL_DIR"
+    log "Installed files:"
+    ls -lh "$INSTALL_DIR" | head -10
 }
 
 validate_config() {
